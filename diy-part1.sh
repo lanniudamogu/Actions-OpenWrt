@@ -9,7 +9,7 @@
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
-
+git checkout 1f2e0cb0653c4a9cac84c62770768e3c41670b23
 # Uncomment a feed source
 #sed -i 's/^#\(.*helloworld\)/\1/' feeds.conf.default
 
