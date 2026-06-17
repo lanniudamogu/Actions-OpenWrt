@@ -4,6 +4,8 @@ env:
   REPO_URL: https://github.com/padavanonly/immortalwrt-mt798x-6.6
   REPO_BRANCH: openwrt-24.10-6.6
 
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 
 on:
   workflow_dispatch:
@@ -17,41 +19,71 @@ jobs:
 
     steps:
 
-    - name: Checkout empty workspace
+    # =========================
+    # Get latest commit hash
+    # =========================
+    - name: Get latest commit hash
+      id: getHash
       run: |
-        mkdir repo && cd repo
-        git init
+        git init repo
+        cd repo
+
         git remote add origin $REPO_URL
         git fetch --depth=1 origin $REPO_BRANCH
         git checkout FETCH_HEAD
 
         echo "commitHash=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
-      id: getHash
 
 
     # =========================
-    # cache compare (v4)
+    # Load previous hash (artifact cache replacement)
     # =========================
-    - name: Compare Commit Hash
+    - name: Restore previous hash
       id: cacheHash
       uses: actions/cache@v4
       with:
         path: .commitHash
-        key: commitHash-${{ steps.getHash.outputs.commitHash }}
+        key: commitHash-${{ env.REPO_BRANCH }}
 
 
-    - name: Save commit hash file
-      if: steps.cacheHash.outputs.cache-hit != 'true'
+    # =========================
+    # Compare hash
+    # =========================
+    - name: Compare hashes
+      id: compare
+      run: |
+        NEW="${{ steps.getHash.outputs.commitHash }}"
+
+        if [ -f .commitHash ]; then
+          OLD=$(cat .commitHash)
+        else
+          OLD=""
+        fi
+
+        echo "new=$NEW" >> $GITHUB_OUTPUT
+
+        if [ "$NEW" != "$OLD" ]; then
+          echo "changed=true" >> $GITHUB_OUTPUT
+        else
+          echo "changed=false" >> $GITHUB_OUTPUT
+        fi
+
+
+    # =========================
+    # Save new hash
+    # =========================
+    - name: Save new hash
+      if: steps.compare.outputs.changed == 'true'
       run: |
         echo "${{ steps.getHash.outputs.commitHash }}" > .commitHash
 
 
     # =========================
-    # trigger build only when changed
+    # Trigger build
     # =========================
     - name: Trigger build
-      if: steps.cacheHash.outputs.cache-hit != 'true'
-      uses: peter-evans/repository-dispatch@v2
+      if: steps.compare.outputs.changed == 'true'
+      uses: peter-evans/repository-dispatch@v3
       with:
         token: ${{ github.token }}
         event-type: Source Code Update
