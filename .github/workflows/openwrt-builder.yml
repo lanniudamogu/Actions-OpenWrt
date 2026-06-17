@@ -24,13 +24,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - device: Redmi_AX6000
-            config: configs/ax6000.config
+          - device: cudy_tr3000
+            config: configs/cudy_tr3000-v1-ubootmod.config
 
-          - device: GL_MT6000
+          #- device: GL_MT6000
             config: configs/mt6000.config
 
-          - device: x86_64
+          #- device: x86_64
             config: configs/x86_64.config
 
 
