@@ -27,12 +27,6 @@ jobs:
           - device: cudy_tr3000
             config: configs/cudy_tr3000-v1-ubootmod.config
 
-          #- device: GL_MT6000
-            config: configs/mt6000.config
-
-          #- device: x86_64
-            config: configs/x86_64.config
-
 
     name: Build-${{ matrix.device }}
 
