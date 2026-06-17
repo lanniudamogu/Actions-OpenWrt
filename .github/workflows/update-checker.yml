@@ -1,25 +1,15 @@
-#
-# https://github.com/P3TERX/Actions-OpenWrt
-#
-# File: .github/workflows/update-checker.yml
-# Description: Source code update checker
-#
-# Copyright (c) 2019-2024 P3TERX <https://p3terx.com>
-#
-# This is free software, licensed under the MIT License.
-# See /LICENSE for more information.
-#
-
 name: Update Checker
 
 env:
   REPO_URL: https://github.com/padavanonly/immortalwrt-mt798x-6.6
   REPO_BRANCH: openwrt-24.10-6.6
 
+
 on:
   workflow_dispatch:
   schedule:
     - cron: 0 */18 * * *
+
 
 jobs:
   check:
@@ -27,24 +17,38 @@ jobs:
 
     steps:
 
-    - name: Get Commit Hash
-      id: getHash
+    - name: Checkout empty workspace
       run: |
-        git clone --depth 1 $REPO_URL -b $REPO_BRANCH .
-        echo "commitHash=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+        mkdir repo && cd repo
+        git init
+        git remote add origin $REPO_URL
+        git fetch --depth=1 origin $REPO_BRANCH
+        git checkout FETCH_HEAD
 
+        echo "commitHash=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+      id: getHash
+
+
+    # =========================
+    # cache compare (v4)
+    # =========================
     - name: Compare Commit Hash
       id: cacheHash
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: .commitHash
-        key: commitHash_${{ steps.getHash.outputs.commitHash }}
+        key: commitHash-${{ steps.getHash.outputs.commitHash }}
 
-    - name: Save New Commit Hash
+
+    - name: Save commit hash file
       if: steps.cacheHash.outputs.cache-hit != 'true'
       run: |
-        echo ${{ steps.getHash.outputs.commitHash }} | tee .commitHash
+        echo "${{ steps.getHash.outputs.commitHash }}" > .commitHash
 
+
+    # =========================
+    # trigger build only when changed
+    # =========================
     - name: Trigger build
       if: steps.cacheHash.outputs.cache-hit != 'true'
       uses: peter-evans/repository-dispatch@v2
@@ -52,6 +56,10 @@ jobs:
         token: ${{ github.token }}
         event-type: Source Code Update
 
+
+    # =========================
+    # cleanup
+    # =========================
     - name: Delete workflow runs
       uses: Mattraks/delete-workflow-runs@v2
       with:
