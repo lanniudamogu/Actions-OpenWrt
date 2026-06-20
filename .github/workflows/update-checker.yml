@@ -9,64 +9,102 @@ env:
 
 on:
   workflow_dispatch:
+
   schedule:
-    - cron: 0 */18 * * *
+    - cron: "0 */18 * * *"
 
 
 jobs:
   check:
+
     runs-on: ubuntu-latest
+
 
     steps:
 
     # =========================
-    # Get latest commit hash
+    # Checkout current repo
+    # =========================
+    - name: Checkout
+      uses: actions/checkout@v4
+
+
+
+    # =========================
+    # Get upstream commit
     # =========================
     - name: Get latest commit hash
       id: getHash
       run: |
-        git init repo
-        cd repo
+
+        git init upstream
+
+        cd upstream
 
         git remote add origin $REPO_URL
+
         git fetch --depth=1 origin $REPO_BRANCH
-        git checkout FETCH_HEAD
 
-        echo "commitHash=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+        HASH=$(git rev-parse FETCH_HEAD)
+
+        echo "hash=$HASH" >> $GITHUB_OUTPUT
+
 
 
     # =========================
-    # Load previous hash (artifact cache replacement)
+    # Restore old hash
     # =========================
-    - name: Restore previous hash
-      id: cacheHash
+    - name: Restore hash
       uses: actions/cache@v4
+      id: hash-cache
       with:
+
         path: .commitHash
-        key: commitHash-${{ env.REPO_BRANCH }}
+
+        key: commit-${{ runner.os }}-${{ env.REPO_BRANCH }}-${{ github.run_id }}
+
+        restore-keys: |
+          commit-${{ runner.os }}-${{ env.REPO_BRANCH }}-
+
 
 
     # =========================
-    # Compare hash
+    # Compare
     # =========================
-    - name: Compare hashes
+    - name: Compare
       id: compare
       run: |
-        NEW="${{ steps.getHash.outputs.commitHash }}"
+
+        NEW="${{ steps.getHash.outputs.hash }}"
+
 
         if [ -f .commitHash ]; then
+
           OLD=$(cat .commitHash)
+
         else
+
           OLD=""
+
         fi
 
-        echo "new=$NEW" >> $GITHUB_OUTPUT
+
+        echo "OLD=$OLD"
+
+        echo "NEW=$NEW"
+
+
 
         if [ "$NEW" != "$OLD" ]; then
+
           echo "changed=true" >> $GITHUB_OUTPUT
+
         else
+
           echo "changed=false" >> $GITHUB_OUTPUT
+
         fi
+
 
 
     # =========================
@@ -75,25 +113,36 @@ jobs:
     - name: Save new hash
       if: steps.compare.outputs.changed == 'true'
       run: |
-        echo "${{ steps.getHash.outputs.commitHash }}" > .commitHash
+
+        echo "${{ steps.getHash.outputs.hash }}" > .commitHash
+
 
 
     # =========================
-    # Trigger build
+    # Trigger OpenWrt build
     # =========================
     - name: Trigger build
       if: steps.compare.outputs.changed == 'true'
+
       uses: peter-evans/repository-dispatch@v3
+
       with:
+
         token: ${{ github.token }}
+
         event-type: Source Code Update
 
 
+
     # =========================
-    # cleanup
+    # Cleanup
     # =========================
     - name: Delete workflow runs
+
       uses: Mattraks/delete-workflow-runs@v2
+
       with:
+
         retain_days: 0
+
         keep_minimum_runs: 2
